@@ -36,3 +36,11 @@ compileInputs in (Compile, compile) <<=
 mainClass in Compile := Some("app.Main") //Used in Universal packageBin
 
 mainClass in (Compile, run) := Some("app.Main") //Used from normal sbt
+
+enablePlugins(JavaServerAppPackaging, DockerPlugin)
+
+dockerRepository := Some("cwmyers")
+
+dockerBaseImage := scala.util.Properties.envOrElse("DOCKER_IMAGE", "openjdk:latest")
+
+packageName in Docker := scala.util.Properties.envOrElse("DOCKER_PACKAGE_NAME", packageName.value)
