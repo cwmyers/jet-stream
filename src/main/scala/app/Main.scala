@@ -3,37 +3,39 @@ package app
 import app.extract.Extract
 import app.infrastructure.concurrency
 import app.load.Load
-import app.transform.Transform
-import io.circe.generic.auto._
-import io.circe.syntax._
-import app.model.Codecs._
-
-import scala.concurrent.duration._
-import scalaz.concurrent.{Strategy, Task}
-import scalaz.stream.Process
-import scalaz.stream.process1.unchunk
-import scalaz.stream.time.awakeEvery
+import app.model.Event
+import app.transform.{Dump1090, Transform}
+import fs2.{Scheduler, Strategy, Stream, Task}
 
 object Main {
 
   def main(args: Array[String]): Unit = {
 
-    val ec          = concurrency.createExecutionContext(10, "jet-stream-%d")
-    val strategy    = Strategy.Executor(ec)
-    val extractor   = Extract.createExtractor()
-    val loader      = new Load(ec).sendToEvents
-    val transformer = Transform.createEvents _
+    val eventStreamUrl     = sys.env.getOrElse("EVENT_STREAM_URL", "http://192.168.1.198:9090")
+    val source             = sys.env.getOrElse("DATA_SOURCE", "dump1090")
+    val ec                 = concurrency.createExecutionContext(10, "jetstream")
+    val ecLoader           = concurrency.createExecutionContext(10, "eventstream")
+    implicit val strategy  = Strategy.fromExecutionContext(ec)
+    implicit val scheduler = Scheduler.fromFixedDaemonPool(1)
+    val extractor          = getExtractor(source, strategy)
+    val loader             = new Load(strategy, eventStreamUrl, ecLoader).send _
+    val transformer        = getTransformer(source)
 
-    val events: Process[Task, String] =
-      awakeEvery(1.minute)(strategy, Strategy.DefaultTimeoutScheduler)
-        .flatMap(_ => extractor)
-        .map(transformer)
-        .pipe(unchunk)
-        .map(_.asJson.noSpaces)
-        .observe(loader)
+    JetStream.create(extractor, transformer, loader)(strategy, scheduler).run.unsafeRun()
 
-    events.run.run
+  }
 
+  def getExtractor(source: String, strategy: Strategy): Stream[Task, String] = source match {
+    case "dump1090" =>
+      val file = sys.env.getOrElse("DUMP1090_FILE", "aircraft.json")
+      Extract.createExtractorFromDump1090(file)
+    case "fr24" => Extract.createExtractorFromFlightRadar24(strategy)
+    case _      => throw new RuntimeException(s"Unknown source: $source")
+  }
+
+  def getTransformer(source: String): String => Vector[Event] = source match {
+    case "dump1090" => Dump1090.createEventsFromDump1090
+    case "fr24"     => Transform.createEventsFromFlightRadar
   }
 
 }

@@ -7,23 +7,27 @@ scalaVersion := "2.11.8"
 
 sbtVersion := "0.13.11"
 
-scalacOptions ++= Seq("-Xfatal-warnings", "-feature")
-
-val unfilteredLibraryVersion = "0.8.4"
+scalacOptions ++= Seq(
+  "-Xfatal-warnings",
+  "-Ywarn-unused-import",
+  "-feature")
 
 val circeVersion = "0.5.1"
+val fs2Version   = "0.9.1"
 
 libraryDependencies ++= Seq(
   "io.circe"                               %% "circe-core"               % circeVersion,
   "io.circe"                               %% "circe-generic"            % circeVersion,
   "io.circe"                               %% "circe-parser"             % circeVersion,
   "io.circe"                               %% "circe-optics"             % circeVersion,
-  "org.scalaz.stream"                      %% "scalaz-stream"            % "0.8.3",
+  "co.fs2"                                 %% "fs2-core"                 % fs2Version,
+  "co.fs2"                                 %% "fs2-io"                   % fs2Version,
+  "commons-io"                             % "commons-io"                % "2.4",
   "net.databinder.dispatch"                %% "dispatch-core"            % "0.11.2",
   "commons-lang"                           %  "commons-lang"             % "2.6",
   "org.slf4j"                              %  "jul-to-slf4j"             % "1.7.7",
   "ch.qos.logback"                         %  "logback-classic"          % "1.1.2",
-  "org.specs2"                             %% "specs2"                   % "2.4.15" % "test"
+  "org.specs2"                             %% "specs2-core"              % "3.8.4"      % "test"
 )
 
 

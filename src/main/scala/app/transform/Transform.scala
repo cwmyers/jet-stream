@@ -5,17 +5,22 @@ import java.time.{Instant, OffsetDateTime, ZoneId}
 import app.model._
 import cats.data.Xor
 import cats.implicits._
+import io.circe.generic.auto._
 import io.circe.optics.JsonPath._
 import io.circe.parser._
 import io.circe.{Json, ParsingFailure}
+import io.circe.syntax._
+import Codecs._
 
 object Transform {
-  def createEvents(payload: String): Vector[Event] = {
+  val keysToIgnore: Vector[String] = Vector("stats", "full_count", "version")
+
+  def createEventsFromFlightRadar(payload: String): Vector[Event] = {
     val maybePlanes: Xor[ParsingFailure, Vector[Event]] = for {
       payload <- parse(payload)
-      a <- payload.asObject.toRightXor(ParsingFailure("", new RuntimeException("blah")))
-      b = a.toMap.filterKeys(k => !Vector("stats", "full_count", "version").contains(k)).toVector.map(_._2)
-      planes = b.traverse(createPlane).orEmpty
+      payloadObject <- payload.asObject.toRightXor(ParsingFailure("", new RuntimeException("blah")))
+      records = payloadObject.toMap.filterKeys(!keysToIgnore.contains(_)).values.toVector
+      planes = records.traverse(createPlane).orEmpty
     } yield planes
 
     maybePlanes.getOrElse(Vector.empty)
@@ -38,17 +43,21 @@ object Transform {
       destination <- root.index(12).string.getOption(json)
       flightNumber <- root.index(13).string.getOption(json)
       altFlightNumber <- root.index(16).string.getOption(json)
-    } yield
+      instant = OffsetDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault())
+    } yield {
       Event(
         registration,
         "planes",
-        OffsetDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.systemDefault()),
+        instant,
         Plane(
-          Position(lat, lon, altitude, velocity),
+          Position(lat, lon, altitude, velocity, track, instant),
           Aircraft(aircraft, registration, modeSCode),
-          Flight(flightNumber, altFlightNumber, origin, destination)
-        )
+          Flight(flightNumber, altFlightNumber, origin, destination),
+          Communication(modeSCode, squawk)
+        ).asJson
       )
+    }
 
   }
+
 }

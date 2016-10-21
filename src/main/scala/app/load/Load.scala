@@ -1,20 +1,17 @@
 package app.load
 
-import app.infrastructure.concurrency
 import dispatch.{Http, Req, url}
+import fs2.{Strategy, Task}
 
 import scala.concurrent.ExecutionContext
-import scalaz.concurrent.Task
-import scalaz.stream.{Sink, sink}
 
-class Load(ec: ExecutionContext) {
-
-  def sendToEvents: Sink[Task, String] = {
-    sink.lift(send)
-  }
+class Load(strategy: Strategy, address: String, ec: ExecutionContext) {
 
   def send(event: String): Task[Unit] = {
-    val request: Req = url("http://192.168.1.198:9090/event") << event
-    concurrency.toTask(Http(request)(ec))(ec).map(_ => ())
+    val request: Req = url(s"$address/event") << event
+    Task.fromFuture {
+      Http(request)(ec)
+    }(strategy, ec).map(_ => ())
   }
+
 }
