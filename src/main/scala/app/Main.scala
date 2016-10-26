@@ -13,6 +13,7 @@ object Main {
 
     val eventStreamUrl     = sys.env.getOrElse("EVENT_STREAM_URL", "http://192.168.1.198:9090")
     val source             = sys.env.getOrElse("DATA_SOURCE", "dump1090")
+    val interval           = sys.env.getOrElse("POST_INTERVAL", "30").toInt
     val ec                 = concurrency.createExecutionContext(10, "jetstream")
     val ecLoader           = concurrency.createExecutionContext(10, "eventstream")
     implicit val strategy  = Strategy.fromExecutionContext(ec)
@@ -21,7 +22,7 @@ object Main {
     val loader             = new Load(strategy, eventStreamUrl, ecLoader).send _
     val transformer        = getTransformer(source)
 
-    JetStream.create(extractor, transformer, loader)(strategy, scheduler).run.unsafeRun()
+    JetStream.create(interval, extractor, transformer, loader)(strategy, scheduler).run.unsafeRun()
 
   }
 

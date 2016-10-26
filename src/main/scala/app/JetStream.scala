@@ -12,11 +12,12 @@ import scala.concurrent.duration._
 
 object JetStream {
 
-  def create(extractor: Stream[Task, String],
+  def create(interval: Int,
+             extractor: Stream[Task, String],
              transformer: String => Vector[Event],
              loader: String => Task[Unit])(implicit strategy: Strategy, scheduler: Scheduler): Stream[Task, Unit] = {
     time
-      .awakeEvery[Task](30.seconds)
+      .awakeEvery[Task](interval.seconds)
       .flatMap(_ => extractor)
       .map(transformer)
       .flatMap(Stream.emits)
